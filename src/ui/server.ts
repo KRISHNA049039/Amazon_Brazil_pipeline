@@ -4,6 +4,8 @@ import { fileURLToPath } from "url";
 import { PipelineExecutor, CallbackApprovalProvider, DefaultStepActionExecutor } from "../pipeline-engine/pipeline-executor.js";
 import { PipelineLogger } from "../pipeline-engine/pipeline-logger.js";
 import { PipelineDefinition } from "../shared/pipeline-types.js";
+import { PackageRegistry } from "../build-system/package-registry.js";
+import { registerBop40Packages, bop40PipelineDefinition } from "./bop40-seed.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,6 +18,14 @@ const logger = new PipelineLogger();
 const approvalProvider = new CallbackApprovalProvider();
 const actionExecutor = new DefaultStepActionExecutor();
 const executor = new PipelineExecutor(actionExecutor, logger, approvalProvider);
+
+// ─── Register BOP 40 packages with build system ───
+const packageRegistry = new PackageRegistry();
+registerBop40Packages(packageRegistry);
+console.log(`Registered ${packageRegistry.list().length} BOP 40 packages`);
+
+// ─── Register BOP 40 pipeline ───
+executor.registerDefinition(bop40PipelineDefinition);
 
 // Seed a demo pipeline with artifacts and approval gate
 const demoPipeline: PipelineDefinition = {
@@ -91,6 +101,18 @@ const simplePipeline: PipelineDefinition = {
 executor.registerDefinition(simplePipeline);
 
 // ─── API Routes ───
+
+app.get("/api/packages", (_req, res) => {
+  const packages = packageRegistry.list().map((p) => ({
+    id: p.id,
+    name: p.name,
+    version: p.version,
+    dependencies: p.dependencies,
+    buildSteps: p.buildSteps,
+    registeredAt: p.registeredAt.toISOString(),
+  }));
+  res.json(packages);
+});
 
 app.get("/api/pipelines", (_req, res) => {
   const defs = executor.getAllDefinitions();
